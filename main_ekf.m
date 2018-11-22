@@ -24,7 +24,7 @@ load('circle_xy.mat')
 % Decide which sensors we wish to fuse in the EKF
 USE_IMU = false;
 USE_FLOW = true;
-USE_UWB = false;
+USE_UWB = true;
 
 % std deviations of initial states 
 std_xy0 = 1; 
@@ -108,7 +108,7 @@ for k = 2:K
         pred_dist = Xpr(k,3) / R(3,3);
         meas_dist = flowdeck(flow_k,3);
         error = meas_dist - pred_dist;
-        std_tof = 0.01;
+        std_tof = 0.001;
         h = zeros(1,9);
         h(3) = 1 / R(3,3);
         [Xpo(k,:),Ppo(k,:,:)] = update_state(squeeze(Ppr(k,:,:)),Xpr(k,:),h,error,std_tof);    
@@ -117,16 +117,61 @@ for k = 2:K
     if(~isempty(uwb1_k) && USE_UWB)
         % We have a new UWB measurement from anchors 1-4
         % update the states based in the measurement model
+        H = zeros(4,9);
+        std_uwb = 0.005;
+        Q = diag([std_uwb std_uwb std_uwb std_uwb]);
+        for i = 1:4
+            dxi = Xpr(k,1) - anchor_pos(1,i);
+            dyi = Xpr(k,2) - anchor_pos(2,i);
+            dzi = Xpr(k,3) - anchor_pos(3,i);
+            disti = sqrt(dxi^2 + dyi^2 + dzi^2);
+            H(i,1:3) = [dxi/disti dyi/disti dzi/disti];
+            Err_uwb1(i) = uwb1(uwb1_k,i) - disti;
+        end
+        [Xpo(k,:),Ppo(k,:,:)] = update_state(squeeze(Ppr(k,:,:)),Xpr(k,:),H,Err_uwb1',Q);    
     end
     
     if(~isempty(uwb2_k) && USE_UWB)
         % We have a new UWB measurement from anchors 5-8
         % update the states based in the measurement model
+        H = zeros(4,9);
+        std_uwb = 0.005;
+        Q = diag([std_uwb std_uwb std_uwb std_uwb]);
+        for i = 1:4
+            dxi = Xpr(k,1) - anchor_pos(1,i+4);
+            dyi = Xpr(k,2) - anchor_pos(2,i+4);
+            dzi = Xpr(k,3) - anchor_pos(3,i+4);
+            disti = sqrt(dxi^2 + dyi^2 + dzi^2);
+            H(i,1:3) = [dxi/disti dyi/disti dzi/disti];
+            Err_uwb2(i) = uwb2(uwb2_k,i) - disti;
+        end
+        [Xpo(k,:),Ppo(k,:,:)] = update_state(squeeze(Ppr(k,:,:)),Xpr(k,:),H,Err_uwb2',Q);
     end
 end
 
 %% Plot estimated altitude vs ground truth
 figure(1)
+subplot(3,1,1)
+plot(t,Xpo(:,1),'r','Linewidth',2)
+grid on
+hold on
+plot(t_vicon,pos_vicon(:,1),'b','Linewidth',2)
+plot(t_cmds, ref(:,1),'--k', 'LineWidth', 1.5)
+xlabel('t [s]')
+ylabel('x [m]')
+legend('Estimate','VICON ground truth', 'Command')
+
+subplot(3,1,2)
+plot(t,Xpo(:,2),'r','Linewidth',2)
+grid on
+hold on
+plot(t_vicon,pos_vicon(:,2),'b','Linewidth',2)
+plot(t_cmds, ref(:,2),'--k', 'LineWidth', 1.5)
+xlabel('t [s]')
+ylabel('y [m]')
+legend('Estimate','VICON ground truth', 'Command')
+
+subplot(3,1,3)
 plot(t,Xpo(:,3),'r','Linewidth',2)
 grid on
 hold on
@@ -135,8 +180,3 @@ plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
 xlabel('t [s]')
 ylabel('z [m]')
 legend('Estimate','VICON ground truth', 'Command')
-
-
-
-
-
