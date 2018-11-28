@@ -18,7 +18,7 @@ close all;
 % Select which mat file you want to load
 [FileName,PathName,FilterIndex] = uigetfile('.mat');
 load(FileName);
-% load('sine_xyz_fast_log30hz.mat')
+load('sine_xyz_fast_log30hz.mat')
 
 % Plot followed trajectory in XYZ along with the commands sent
 % FIGURE1: VICON ground truth and setpoints

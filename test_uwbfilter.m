@@ -24,7 +24,8 @@ outlier_th = 2;
 id = 4;
 K = length(t_uwb2);
 history_length = 4;
-l =1;
+l = 1;
+
 for k=1:K
    if k > history_length
        mean_uwb = mean(uwb2(k-history_length:k-1,id));
