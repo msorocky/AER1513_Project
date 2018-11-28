@@ -21,8 +21,8 @@ close all;
 load('circle_xy.mat')
 
 % Decide which sensors we wish to fuse in the EKF
-VISUALIZE_UWB1 = false;
-VISUALIZE_UWB2 = true;
+VISUALIZE_UWB1 = true;
+VISUALIZE_UWB2 = false;
 
 % Create a compound vector t with a sorted merge of all the time bases
 t = unique(sort([t_imu; t_uwb1; t_uwb2; t_flow]));

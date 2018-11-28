@@ -135,19 +135,14 @@ for k = 2:K
     
     if(~isempty(uwb_k) && USE_UWB)
         % We have a new UWB measurement from anchors 1-8
-        % update the states based in the measurement model
-        H = zeros(8,9);
-        std_uwb = 0.005;
-        Q = std_uwb*eye(8,8);
-        for i = 1:8
-            dxi = Xpr(k,1) - anchor_pos(1,i);
-            dyi = Xpr(k,2) - anchor_pos(2,i);
-            dzi = Xpr(k,3) - anchor_pos(3,i);
-            disti = sqrt(dxi^2 + dyi^2 + dzi^2);
-            H(i,1:3) = [dxi/disti dyi/disti dzi/disti];
-            Err_uwb(i) = uwb(uwb_k,i) - disti;
-        end
-        [Xpo(k,:),Ppo(k,:,:)] = update_state(squeeze(Ppr(k,:,:)),Xpr(k,:),H,Err_uwb',Q);    
+        % Do a trilateration to pinpoint 3D location of tag
+        pos(:,uwb_k) = trilateration3D(anchor_pos(:,anchor_id),uwb(uwb_k,anchor_id)); 
+        H = [eye(3,3) zeros(3,6)];
+        std_xy = 0.001;
+        std_z = 0.008;
+        Q = diag([std_xy std_xy std_z]);
+        Err_uwb = pos(:,uwb_k) - Xpr(k,1:3)';
+        [Xpo(k,:),Ppo(k,:,:)] = update_state(squeeze(Ppr(k,:,:)),Xpr(k,:),H,Err_uwb,Q);    
     end
 end
 
