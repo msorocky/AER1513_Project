@@ -1,5 +1,4 @@
-clear
-
+function [Xpo,Ppo,t] = EKF(dataset,sensors)
 %%%%%%%%%%%%%%%%%%%%%%%%%% DATASET FORMAT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % anchor_pos -> 3D location of anchors in VICON frame, ordered from 1-8
 % flowdeck ->  first two columns correspond to the accumulated pixels in X, Y
@@ -11,20 +10,24 @@ clear
 % uwb1 -> distance measurements to anchors 1-4
 % uwb2 -> distance measurements to anchors 5-8
 
+% INPUTS:
+% dataset -> string containing the name of the dataset
+% sensors -> struct with boolean variables defining which sensors
+%            to use
 
-% Load the dataset
-% Select which mat file you want to load
-% [FileName,PathName,FilterIndex] = uigetfile('.mat');
-% load(FileName);
+% OUTPUTS:
+% Xpo -> posterior estimate given by the EKF
+% Ppo -> posterior covariance given by the EKF
+% t -> timebase of the estimates, used for plotting
 
-load('sine_xyz_fast.mat')
+load(dataset)
 %%%%%%%%%%%%%%%%%% INITIAL CONFIG %%%%%%%%%%%%%%%%%%%%%%%%%
 % Decide which sensors we wish to fuse in the EKF
-USE_IMU = true;
-USE_FLOW = false;
-USE_UWB = false;
-USE_ZRANGER = false;
-trilat = true;
+USE_IMU = sensors.use_imu;
+USE_FLOW = sensors.use_flow;
+USE_UWB = sensors.use_uwb;
+USE_ZRANGER = sensors.use_zranger;
+trilat = sensors.trilat;
 
 % std deviations of initial states 
 std_xy0 = 0.01; 
@@ -54,10 +57,10 @@ omega_factor = 1.25;
 
 % Standard deviations of each sensor (tuning parameters)
 std_flow = 0.1;
-std_tof = 0.0001; 
-std_uwb = 0.005;
-std_xy_trilat = 0.03;
-std_z_trilat = 0.09;
+std_tof = 0.001; 
+std_uwb = 0.03;
+std_xy_trilat = 0.02;
+std_z_trilat = 0.03;
 
 %%%%%%%%%%%%%%%%% INITIALIZATION OF EKF %%%%%%%%%%%%%%%%%%%%
 
@@ -81,7 +84,20 @@ t_uwb = t_uwb1(idx_uwb);
 uwb = [uwb1 uwb2];
 
 % Create a compound vector t with a sorted merge of all the time bases
-t = unique(sort([t_imu; t_uwb; t_flow]));
+time_bases = [];
+if USE_IMU
+    time_bases = [time_bases; t_imu];
+end
+
+if USE_UWB
+    time_bases = [time_bases; t_uwb];
+end
+
+if USE_FLOW || USE_ZRANGER
+    time_bases = [time_bases; t_flow];
+end
+
+t = unique(sort(time_bases));
 K = length(t);
 
 % Initial states/inputs
@@ -123,13 +139,6 @@ Ppo(1,:,:) = P0;
     
 % Decide which anchors to fuse
 anchor_id = [1,2,3,4,5,6,7,8];
-
-acc_vicon(1, :) = [0 0 0];
-vel_vicon(1, :) = [0 0 0];
-for k = 2:length(t_vicon)
-    dt = t_vicon(k) - t_vicon(k-1);
-    vel_vicon(k, :) = (pos_vicon(k, :) - pos_vicon(k-1,:))/dt;
-end
 
 for k = 2:K
         
@@ -205,7 +214,7 @@ for k = 2:K
             Xpr(k, 3:6) = [0 0 0 0];
         end     
                
-    else
+    elseif(USE_IMU)
         % If we don't have IMU data, integrate the last acceleration
         % measurement (f_k) over one timestep to give our prior estimates
         Ppr(k,:,:) = squeeze(Ppo(k-1,:,:)) + Q;
@@ -223,6 +232,9 @@ for k = 2:K
         Xpr(k, 4:6) = Xpo(k-1, 4:6) + (f_k - GRAVITY_MAGNITUDE*R'*e3)'*dt;
         
         f(k, 1:3) = f_k;
+    else
+        Ppr(k,:,:) = squeeze(Ppo(k-1,:,:)) + Q;
+        Ppr(k,:,:) = 0.5*(squeeze(Ppr(k-1,:,:))+squeeze(Ppr(k-1,:,:))');
     end
     
     % Initially take our posterior estimates as the prior estimates
@@ -231,7 +243,7 @@ for k = 2:K
     Ppo(k,:,:) = Ppr(k, :, :);
     updated = false;
 
-    if(~isempty(flow_k) && USE_FLOW)
+    if(~isempty(flow_k) && (USE_FLOW || USE_ZRANGER))
                 
         cos_alpha = R(3,3); % Cosine of the angle between body and inertial z-axes
         
@@ -301,25 +313,22 @@ for k = 2:K
         end
 
     end
-    
-    vel_flow(k,:) = Xpo(k, 4:6);
-    
+        
     if(~isempty(uwb_k) && USE_UWB)
         if (trilat)
             % We have a new UWB measurement from anchors 1-8
             % Do a trilateration to pinpoint 3D location of tag
             pos_trilat(:,uwb_k) = trilateration3D(anchor_pos(:,anchor_id),uwb(uwb_k,anchor_id)); 
             H = [eye(3,3) zeros(3,6)];
-            std_xy = 0.001;
-            std_z = 0.008;
-            Q = diag([std_xy std_xy std_z]);
+            var_xy = std_xy_trilat^2;
+            var_z = std_z_trilat^2;
+            Q = diag([var_xy var_xy var_z]);
             Err_uwb = pos_trilat(:,uwb_k) - Xpr(k,1:3)';
             [Xpo(k,:),Ppo(k,:,:)] = update_state(squeeze(Ppr(k,:,:)),Xpr(k,:),H,Err_uwb,Q);
         else
             % We have a new UWB measurement from anchors 1-8
             % update the states based on the distance measurement
             H = zeros(8,9);
-            std_uwb = 0.005;
             Q = std_uwb^2*eye(8,8);
             for i = 1:8
                 dxi = Xpr(k,1) - anchor_pos(1,i);
@@ -334,138 +343,12 @@ for k = 2:K
     end
     
     if (updated)
-        
-        v = Xpo(k, 7:9)*dt;
-        
+        v = Xpo(k, 7:9)*dt;     
         A = blkdiag(eye(3), eye(3), expm(cross(v/2.0)));
         Ppo(k,:,:) = A * squeeze(Ppo(k,:,:)) * A';
         Ppo(k,:,:) = 0.5*(squeeze(Ppo(k,:,:))+squeeze(Ppo(k,:,:))');
         R  = expm(cross(v))*R;
         Xpo(k, 7:9) = [0 0 0];
-
-    end
-    
+    end 
 end
 
-% Try integration of the velocity/acceleration to compare with the EKF
-pos(1, 1:3) = [1 0 0];
-for k = 2:K
-    dt = t(k) - t(k-1);
-    dX = Xpo(k-1, 4:6) * dt + f(k, :)*dt^2/2.0;
-%     pos(k,:) = pos(k-1,:) + (squeeze(R_list(k, :,:))*dX')' - [0 0 GRAVITY_MAGNITUDE]*dt^2/2.0;   
-    pos(k,:) = pos(k-1,:) + Xpo(k-1, 4:6)*dt - [0 0 GRAVITY_MAGNITUDE]*dt^2/2.0;   
-end
-
-% Integrate accelerometer measurements to compare with velocity estimates
-v(1, :) = [0 0 0];
-for k = 2:length(t_imu)
-
-    dt = t_imu(k) - t_imu(k-1);
-    v(k, :) = imu(k, 1:3) * GRAVITY_MAGNITUDE * dt;
-    
-end
-
-%% Plot estimated altitude vs ground truth
-figure
-subplot(3,1,1)
-plot(t,Xpo(:,1),'r','Linewidth',2)
-grid on
-hold on
-plot(t_vicon,pos_vicon(:,1),'b','Linewidth',2)
-plot(t_cmds, ref(:,1),'--k', 'LineWidth', 1.5)
-xlabel('t [s]')
-ylabel('x [m]')
-legend('Estimate','VICON ground truth', 'Command')
-
-subplot(3,1,2)
-plot(t,Xpo(:,2),'r','Linewidth',2)
-grid on
-hold on
-plot(t_vicon,pos_vicon(:,2),'b','Linewidth',2)
-plot(t_cmds, ref(:,2),'--k', 'LineWidth', 1.5)
-xlabel('t [s]')
-ylabel('y [m]')
-legend('Estimate','VICON ground truth', 'Command')
-
-subplot(3,1,3)
-plot(t,Xpo(:,3),'r','Linewidth',2)
-grid on
-hold on
-plot(t_vicon,pos_vicon(:,3),'b','Linewidth',2)
-plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
-xlabel('t [s]')
-ylabel('z [m]')
-legend('Estimate','VICON ground truth', 'Command')
-
-% Compute RMS errors in each direction
-% Find closest ground truth data based on current time
-for k = 1:K
-    [~,idx_vicon(k)] = min(abs(t(k)-t_vicon));
-end
-
-% Compute error
-rms_x = rms(Xpo(:,1) - pos_vicon(idx_vicon,1))
-rms_y = rms(Xpo(:,2) - pos_vicon(idx_vicon,2))
-rms_z = rms(Xpo(:,3) - pos_vicon(idx_vicon,3))
-
-% figure(2)
-% subplot(3,1,1)
-% plot(t,vel_flow(:,1),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_imu,v(:,1),'r','Linewidth',2)
-% plot(t_vicon,vel_vicon(:,1),'b','Linewidth',2)
-% xlabel('t [s]')
-% ylabel('x [m]')
-% legend('Flow deck velocity','VICON velocity')
-% 
-% subplot(3,1,2)
-% plot(t,vel_flow(:,2),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_imu,v(:,1),'r','Linewidth',2)
-% plot(t_vicon,vel_vicon(:,2),'b','Linewidth',2)
-% xlabel('t [s]')
-% ylabel('y [m]')
-% legend('Flow deck velocity','VICON velocity')
-% 
-% subplot(3,1,3)
-% plot(t,vel_flow(:,3),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_imu,v(:,1),'r','Linewidth',2)
-% plot(t_vicon,vel_vicon(:,3),'b','Linewidth',2)
-% xlabel('t [s]')
-% ylabel('z [m]')
-% legend('Flow deck velocity','VICON velocity')
-% 
-% figure(3)
-% subplot(3,1,1)
-% plot(t,pos(:,1),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_vicon,pos_vicon(:,1),'b','Linewidth',2)
-% plot(t_cmds, ref(:,1),'--k', 'LineWidth', 1.5)
-% xlabel('t [s]')
-% ylabel('x [m]')
-% legend('Position (from Vpo)','VICON ground truth', 'Command')
-% 
-% subplot(3,1,2)
-% plot(t,pos(:,2),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_vicon,pos_vicon(:,2),'b','Linewidth',2)
-% plot(t_cmds, ref(:,2),'--k', 'LineWidth', 1.5)
-% xlabel('t [s]')
-% ylabel('y [m]')
-% legend('Position (from Vpo)','VICON ground truth', 'Command')
-% 
-% subplot(3,1,3)
-% plot(t,pos(:,3),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_vicon,pos_vicon(:,3),'b','Linewidth',2)
-% plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
-% xlabel('t [s]')
-% ylabel('z [m]')
-% legend('Position (from Vpo)','VICON ground truth', 'Command')

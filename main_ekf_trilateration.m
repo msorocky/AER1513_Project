@@ -146,36 +146,36 @@ for k = 2:K
 end
 
 %% Plot estimated altitude vs ground truth
-% figure
-% subplot(3,1,1)
-% plot(t,Xpo(:,1),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_vicon,pos_vicon(:,1),'b','Linewidth',2)
-% plot(t_cmds, ref(:,1),'--k', 'LineWidth', 1.5)
-% xlabel('t [s]')
-% ylabel('x [m]')
-% legend('Estimate','VICON ground truth', 'Command')
-% 
-% subplot(3,1,2)
-% plot(t,Xpo(:,2),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_vicon,pos_vicon(:,2),'b','Linewidth',2)
-% plot(t_cmds, ref(:,2),'--k', 'LineWidth', 1.5)
-% xlabel('t [s]')
-% ylabel('y [m]')
-% legend('Estimate','VICON ground truth', 'Command')
-% 
-% subplot(3,1,3)
-% plot(t,Xpo(:,3),'r','Linewidth',2)
-% grid on
-% hold on
-% plot(t_vicon,pos_vicon(:,3),'b','Linewidth',2)
-% plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
-% xlabel('t [s]')
-% ylabel('z [m]')
-% legend('Estimate','VICON ground truth', 'Command')
+figure
+subplot(3,1,1)
+plot(t,Xpo(:,1),'r','Linewidth',2)
+grid on
+hold on
+plot(t_vicon,pos_vicon(:,1),'b','Linewidth',2)
+plot(t_cmds, ref(:,1),'--k', 'LineWidth', 1.5)
+xlabel('t [s]')
+ylabel('x [m]')
+legend('Estimate','VICON ground truth', 'Command')
+
+subplot(3,1,2)
+plot(t,Xpo(:,2),'r','Linewidth',2)
+grid on
+hold on
+plot(t_vicon,pos_vicon(:,2),'b','Linewidth',2)
+plot(t_cmds, ref(:,2),'--k', 'LineWidth', 1.5)
+xlabel('t [s]')
+ylabel('y [m]')
+legend('Estimate','VICON ground truth', 'Command')
+
+subplot(3,1,3)
+plot(t,Xpo(:,3),'r','Linewidth',2)
+grid on
+hold on
+plot(t_vicon,pos_vicon(:,3),'b','Linewidth',2)
+plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
+xlabel('t [s]')
+ylabel('z [m]')
+legend('Estimate','VICON ground truth', 'Command')
 % 
 % Compute RMS errors in each direction
 % Find closest ground truth data based on current time
