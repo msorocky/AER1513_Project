@@ -295,8 +295,9 @@ for k = 2:K
         end
 
     end
+    
     vel_flow(k,:) = Xpo(k, 4:6);
-
+    
     if(~isempty(uwb_k) && USE_UWB)
         % We have a new UWB measurement from anchors 1-8
         % update the states based in the measurement model
@@ -323,7 +324,7 @@ for k = 2:K
         Ppo(k,:,:) = 0.5*(squeeze(Ppo(k,:,:))+squeeze(Ppo(k,:,:))');
         R  = expm(cross(v))*R;
         Xpo(k, 7:9) = [0 0 0];
-        
+
     end
     
 end
@@ -451,3 +452,7 @@ plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
 xlabel('t [s]')
 ylabel('z [m]')
 legend('Position (from Vpo)','VICON ground truth', 'Command')
+
+rms_x = rms(Xpo(:,1) - pos_vicon(idx_vicon,1))
+rms_y = rms(Xpo(:,2) - pos_vicon(idx_vicon,2))
+rms_z = rms(Xpo(:,3) - pos_vicon(idx_vicon,3))
