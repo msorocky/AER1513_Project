@@ -16,12 +16,11 @@ clear
 % Select which mat file you want to load
 % [FileName,PathName,FilterIndex] = uigetfile('.mat');
 % load(FileName);
-load('sine_xyz_log30hz.mat')
-
+load('sine_xyz_fast.mat')
 %%%%%%%%%%%%%%%%%% INITIAL CONFIG %%%%%%%%%%%%%%%%%%%%%%%%%
 % Decide which sensors we wish to fuse in the EKF
 USE_IMU = false;
-USE_FLOW = true;
+USE_FLOW = false;
 USE_UWB = true;
 
 % std deviations of initial states 
@@ -147,44 +146,80 @@ for k = 2:K
 end
 
 %% Plot estimated altitude vs ground truth
-figure
-subplot(3,1,1)
-plot(t,Xpo(:,1),'r','Linewidth',2)
-grid on
-hold on
-plot(t_vicon,pos_vicon(:,1),'b','Linewidth',2)
-plot(t_cmds, ref(:,1),'--k', 'LineWidth', 1.5)
-xlabel('t [s]')
-ylabel('x [m]')
-legend('Estimate','VICON ground truth', 'Command')
-
-subplot(3,1,2)
-plot(t,Xpo(:,2),'r','Linewidth',2)
-grid on
-hold on
-plot(t_vicon,pos_vicon(:,2),'b','Linewidth',2)
-plot(t_cmds, ref(:,2),'--k', 'LineWidth', 1.5)
-xlabel('t [s]')
-ylabel('y [m]')
-legend('Estimate','VICON ground truth', 'Command')
-
-subplot(3,1,3)
-plot(t,Xpo(:,3),'r','Linewidth',2)
-grid on
-hold on
-plot(t_vicon,pos_vicon(:,3),'b','Linewidth',2)
-plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
-xlabel('t [s]')
-ylabel('z [m]')
-legend('Estimate','VICON ground truth', 'Command')
-
+% figure
+% subplot(3,1,1)
+% plot(t,Xpo(:,1),'r','Linewidth',2)
+% grid on
+% hold on
+% plot(t_vicon,pos_vicon(:,1),'b','Linewidth',2)
+% plot(t_cmds, ref(:,1),'--k', 'LineWidth', 1.5)
+% xlabel('t [s]')
+% ylabel('x [m]')
+% legend('Estimate','VICON ground truth', 'Command')
+% 
+% subplot(3,1,2)
+% plot(t,Xpo(:,2),'r','Linewidth',2)
+% grid on
+% hold on
+% plot(t_vicon,pos_vicon(:,2),'b','Linewidth',2)
+% plot(t_cmds, ref(:,2),'--k', 'LineWidth', 1.5)
+% xlabel('t [s]')
+% ylabel('y [m]')
+% legend('Estimate','VICON ground truth', 'Command')
+% 
+% subplot(3,1,3)
+% plot(t,Xpo(:,3),'r','Linewidth',2)
+% grid on
+% hold on
+% plot(t_vicon,pos_vicon(:,3),'b','Linewidth',2)
+% plot(t_cmds, ref(:,3),'--k', 'LineWidth', 1.5)
+% xlabel('t [s]')
+% ylabel('z [m]')
+% legend('Estimate','VICON ground truth', 'Command')
+% 
 % Compute RMS errors in each direction
 % Find closest ground truth data based on current time
 for k = 1:K
     [~,idx_vicon(k)] = min(abs(t(k)-t_vicon));
 end
+% 
+% % Compute error
+% rms_x = rms(Xpo(:,1) - pos_vicon(idx_vicon,1))
+% rms_y = rms(Xpo(:,2) - pos_vicon(idx_vicon,2))
+% rms_z = rms(Xpo(:,3) - pos_vicon(idx_vicon,3))
 
-% Compute error
-rms_x = rms(Xpo(:,1) - pos_vicon(idx_vicon,1))
-rms_y = rms(Xpo(:,2) - pos_vicon(idx_vicon,2))
-rms_z = rms(Xpo(:,3) - pos_vicon(idx_vicon,3))
+%% Visualize 3D
+figure(2)
+tk = 0:0.1:t(end);
+pk = spline(t,pos_vicon(idx_vicon,:)',tk);
+pk_est = spline(t,Xpo(:,1:3)',tk);
+wnd = 20;
+for k = 1:length(tk)
+    [az,el] = view;
+    for j = 1:8
+        plot3(anchor_pos(1,j),anchor_pos(2,j),anchor_pos(3,j),'*k','markers',12)
+        view([az,el]);
+        hold on;
+    end
+    grid on
+    if k <= wnd
+        plot3(pk_est(1,1:k),pk_est(2,1:k),pk_est(3,1:k),'r','Linewidth',2)
+        plot3(pk(1,1:k),pk(2,1:k),pk(3,1:k),'r','Linewidth',2)
+    else
+        plot3(pk_est(1,k-wnd:k),pk_est(2,k-wnd:k),pk_est(3,k-wnd:k),'r','Linewidth',2)
+        plot3(pk(1,k-wnd:k),pk(2,k-wnd:k),pk(3,k-wnd:k),'b','Linewidth',2)
+    end
+    plot3(pk_est(1,k), pk_est(2,k),pk_est(3,k),...
+                  'o','LineWidth',2,'MarkerEdgeColor','k',...
+                      'MarkerFaceColor','r','markers',12);
+    plot3(pk(1,k), pk(2,k),pk(3,k),...
+                  'o','LineWidth',2,'MarkerEdgeColor','k',...
+                      'MarkerFaceColor','b','markers',12); 
+    xlabel('$x$ [m]','Interpreter','latex','Fontsize',16);
+    ylabel('$y$ [m]','Interpreter','latex','Fontsize',16);
+    zlabel('$z$ [m]','Interpreter','latex','Fontsize',16);
+    set(gcf,'color','w');
+    drawnow
+    hold off
+end
+

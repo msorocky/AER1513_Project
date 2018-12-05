@@ -1,4 +1,4 @@
-clear
+% clear
 
 %%%%%%%%%%%%%%%%%%%%%%%%%% DATASET FORMAT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % anchor_pos -> 3D location of anchors in VICON frame, ordered from 1-8
