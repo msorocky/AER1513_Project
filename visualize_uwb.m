@@ -63,6 +63,10 @@ for k = 2:K
         xlim([-10,10])
         ylim([-10,10])
         zlim([0,10]);
+        xlabel('$x$ [m]','Interpreter','latex','Fontsize',16);
+        ylabel('$y$ [m]','Interpreter','latex','Fontsize',16);
+        zlabel('$z$ [m]','Interpreter','latex','Fontsize',16);
+        set(gcf,'color','w');
         drawnow
         hold off
     end
@@ -92,6 +96,9 @@ for k = 2:K
         xlim([-10,10])
         ylim([-10,10])
         zlim([0,10]);
+        xlabel('$x$ [m]','Interpreter','latex','Fontsize',16);
+        ylabel('$y$ [m]','Interpreter','latex','Fontsize',16);
+        zlabel('$z$ [m]','Interpreter','latex','Fontsize',16);
         drawnow
         hold off
         
